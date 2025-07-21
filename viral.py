@@ -8,33 +8,41 @@ YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 YOUTUBE_VIDEO_URL = "https://www.googleapis.com/youtube/v3/videos"
 YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
 
-# Streamlit App Title
-st.title("YouTube Viral Topics Tool")
+# App Title
+st.title("📺 YouTube Viral Topics Tool")
 
-# Input Fields
-days = st.number_input("Enter Days to Search (1-30):", min_value=1, max_value=30, value=5)
+st.markdown("Configure your search parameters below:")
 
-# List of broader keywords
-keywords = [
- "Affair Relationship Stories", "Reddit Update", "Reddit Relationship Advice", "Reddit Relationship", 
-"Reddit Cheating", "AITA Update", "Open Marriage", "Open Relationship", "X BF Caught", 
-"Stories Cheat", "X GF Reddit", "AskReddit Surviving Infidelity", "GurlCan Reddit", 
-"Cheating Story Actually Happened", "Cheating Story Real", "True Cheating Story", 
-"Reddit Cheating Story", "R/Surviving Infidelity", "Surviving Infidelity", 
-"Reddit Marriage", "Wife Cheated I Can't Forgive", "Reddit AP", "Exposed Wife", 
-"Cheat Exposed"
-]
+# Form for Inputs
+with st.form("search_form"):
+    days = st.number_input("🔁 Days to Search (1-30):", min_value=1, max_value=30, value=5)
+    min_subs = st.number_input("👥 Minimum Subscribers:", min_value=0, value=0)
+    max_subs = st.number_input("👥 Maximum Subscribers:", min_value=1, value=3000)
+    results_per_keyword = st.number_input("🎯 Videos per Keyword (1-10):", min_value=1, max_value=10, value=5)
 
-# Fetch Data Button
-if st.button("Fetch Data"):
+    default_keywords = [
+        "Affair Relationship Stories", "Reddit Update", "Reddit Relationship Advice", "Reddit Relationship", 
+        "Reddit Cheating", "AITA Update", "Open Marriage", "Open Relationship", "X BF Caught", 
+        "Stories Cheat", "X GF Reddit", "AskReddit Surviving Infidelity", "GurlCan Reddit", 
+        "Cheating Story Actually Happened", "Cheating Story Real", "True Cheating Story", 
+        "Reddit Cheating Story", "R/Surviving Infidelity", "Surviving Infidelity", 
+        "Reddit Marriage", "Wife Cheated I Can't Forgive", "Reddit AP", "Exposed Wife", 
+        "Cheat Exposed"
+    ]
+
+    keyword_input = st.text_area("🗝️ Keywords (comma-separated):", value=", ".join(default_keywords))
+    keywords = [kw.strip() for kw in keyword_input.split(",") if kw.strip()]
+
+    submitted = st.form_submit_button("🔍 Fetch Data")
+
+# Main Logic
+if submitted:
     try:
-        # Calculate date range
         start_date = (datetime.utcnow() - timedelta(days=int(days))).isoformat("T") + "Z"
         all_results = []
 
-        # Iterate over the list of keywords
         for keyword in keywords:
-            st.write(f"Searching for keyword: {keyword}")
+            st.write(f"Searching for keyword: **{keyword}**")
 
             # Define search parameters
             search_params = {
@@ -43,15 +51,13 @@ if st.button("Fetch Data"):
                 "type": "video",
                 "order": "viewCount",
                 "publishedAfter": start_date,
-                "maxResults": 5,
+                "maxResults": results_per_keyword,
                 "key": API_KEY,
             }
 
-            # Fetch video data
             response = requests.get(YOUTUBE_SEARCH_URL, params=search_params)
             data = response.json()
 
-            # Check if "items" key exists
             if "items" not in data or not data["items"]:
                 st.warning(f"No videos found for keyword: {keyword}")
                 continue
@@ -64,7 +70,7 @@ if st.button("Fetch Data"):
                 st.warning(f"Skipping keyword: {keyword} due to missing video/channel data.")
                 continue
 
-            # Fetch video statistics
+            # Video statistics
             stats_params = {"part": "statistics", "id": ",".join(video_ids), "key": API_KEY}
             stats_response = requests.get(YOUTUBE_VIDEO_URL, params=stats_params)
             stats_data = stats_response.json()
@@ -73,7 +79,7 @@ if st.button("Fetch Data"):
                 st.warning(f"Failed to fetch video statistics for keyword: {keyword}")
                 continue
 
-            # Fetch channel statistics
+            # Channel statistics
             channel_params = {"part": "statistics", "id": ",".join(channel_ids), "key": API_KEY}
             channel_response = requests.get(YOUTUBE_CHANNEL_URL, params=channel_params)
             channel_data = channel_response.json()
@@ -85,7 +91,6 @@ if st.button("Fetch Data"):
             stats = stats_data["items"]
             channels = channel_data["items"]
 
-            # Collect results
             for video, stat, channel in zip(videos, stats, channels):
                 title = video["snippet"].get("title", "N/A")
                 description = video["snippet"].get("description", "")[:200]
@@ -93,7 +98,7 @@ if st.button("Fetch Data"):
                 views = int(stat["statistics"].get("viewCount", 0))
                 subs = int(channel["statistics"].get("subscriberCount", 0))
 
-                if subs < 3000:  # Only include channels with fewer than 3,000 subscribers
+                if min_subs <= subs <= max_subs:
                     all_results.append({
                         "Title": title,
                         "Description": description,
@@ -104,7 +109,7 @@ if st.button("Fetch Data"):
 
         # Display results
         if all_results:
-            st.success(f"Found {len(all_results)} results across all keywords!")
+            st.success(f"✅ Found {len(all_results)} results across all keywords!")
             for result in all_results:
                 st.markdown(
                     f"**Title:** {result['Title']}  \n"
@@ -115,7 +120,7 @@ if st.button("Fetch Data"):
                 )
                 st.write("---")
         else:
-            st.warning("No results found for channels with fewer than 3,000 subscribers.")
+            st.warning("⚠️ No results found matching your filters.")
 
     except Exception as e:
-        st.error(f"An error occurred: {e}")
+        st.error(f"❌ An error occurred: {e}")
