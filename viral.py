@@ -3,7 +3,7 @@ import requests
 from datetime import datetime, timedelta
 
 # YouTube API Key
-API_KEY = "AIzaSyBSskhuPie--IC5apebIRpD3xwCk0lrJ4g"  # Replace this with your actual API key
+API_KEY = "AIzaSyBSskhuPie--IC5apebIRpD3xwCk0lrJ4g"  # Replace with your real API key
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 YOUTUBE_VIDEO_URL = "https://www.googleapis.com/youtube/v3/videos"
 YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
@@ -12,6 +12,13 @@ YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
 def chunk_list(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
+
+# Helper: Safely convert to integer
+def safe_int(value):
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return 0
 
 # App Title
 st.title("📺 YouTube Viral Topics Tool")
@@ -28,13 +35,13 @@ with st.form("search_form"):
     results_per_keyword = st.number_input("🎯 Videos per Keyword (1–10):", min_value=1, max_value=10, value=5)
 
     default_keywords = [
-        "Affair Relationship Stories", "Reddit Update", "Reddit Relationship Advice", "Reddit Relationship",
-        "Reddit Cheating", "AITA Update", "Open Marriage", "Open Relationship", "X BF Caught",
-        "Stories Cheat", "X GF Reddit", "AskReddit Surviving Infidelity", "GurlCan Reddit",
-        "Cheating Story Actually Happened", "Cheating Story Real", "True Cheating Story",
-        "Reddit Cheating Story", "R/Surviving Infidelity", "Surviving Infidelity",
-        "Reddit Marriage", "Wife Cheated I Can't Forgive", "Reddit AP", "Exposed Wife",
-        "Cheat Exposed"
+        "Real cemetery ghost stories", "Haunted graveyard encounters", "Late night cemetery experiences",
+        "Paranormal cemetery footage", "Creepy cemetery at 3AM", "Voices heard in cemetery",
+        "Shadow figure in graveyard", "True cemetery horror story", "Exploring haunted graveyard",
+        "Scary things caught in cemetery", "Walking alone in old cemetery", "Ghost spotted near tombstone",
+        "Graveyard chills and whispers", "Mysterious lights in cemetery", "Cemetery ghost caught on camera",
+        "Urban legends from graveyards", "Cemetery rituals gone wrong", "Sleep paralysis after cemetery visit",
+        "Strange symbols in cemetery", "Ghost child seen in graveyard"
     ]
 
     keyword_input = st.text_area("🗝️ Keywords (comma-separated):", value=", ".join(default_keywords))
@@ -66,12 +73,16 @@ if submitted:
                     response = requests.get(YOUTUBE_SEARCH_URL, params=search_params)
                     response.raise_for_status()
                     data = response.json()
+                except requests.exceptions.HTTPError as http_err:
+                    st.warning(f"❌ HTTP error for '{keyword}': {http_err}")
+                    continue
                 except Exception as e:
-                    st.warning(f"❌ Failed search for '{keyword}': {e}")
+                    st.warning(f"❌ General error for '{keyword}': {e}")
                     continue
 
                 if "items" not in data or not data["items"]:
                     st.warning(f"⚠️ No videos found for: {keyword}")
+                    st.write(f"📭 Raw API response for '{keyword}':", data)
                     continue
 
                 videos = data["items"]
@@ -107,8 +118,8 @@ if submitted:
                         title = video["snippet"].get("title", "N/A")
                         description = video["snippet"].get("description", "")[:200]
                         video_url = f"https://www.youtube.com/watch?v={video['id']['videoId']}"
-                        views = int(stat["statistics"].get("viewCount", 0))
-                        subs = int(channel["statistics"].get("subscriberCount", 0))
+                        views = safe_int(stat["statistics"].get("viewCount", 0))
+                        subs = safe_int(channel["statistics"].get("subscriberCount", 0))
 
                         # Duration conversion
                         iso_duration = stat["contentDetails"]["duration"]
@@ -138,7 +149,7 @@ if submitted:
                             })
                             st.write(f"✅ Accepted: {title} ({views} views, {subs} subs)")
                         else:
-                            st.write(f"❌ Filtered out: {title}")
+                            st.write(f"❌ Filtered out: {title} — views: {views}, subs: {subs}, duration: {total_minutes:.2f}min, age: {channel_age_years}yrs")
 
                     except Exception as e:
                         st.write(f"⚠️ Error processing video: {e}")
